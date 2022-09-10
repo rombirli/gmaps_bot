@@ -8,10 +8,10 @@ import aiohttp as aiohttp
 import cv2
 import numpy as np
 import pyautogui
-import pyperclip
 from random_address import real_random_address
 
-save_figs = True
+generate_results = True
+comments_base_link = 'http://textfiles.com/politics'
 
 
 def find(template: str) -> ((int, int), ...):
@@ -19,14 +19,13 @@ def find(template: str) -> ((int, int), ...):
     screenshot = pyautogui.screenshot()
     screenshot.save('generated/screenshot.png')
     screenshot = cv2.imread('generated/screenshot.png', 0)
-
     # match pin template at all position on the screenshot
     template_ = cv2.imread(f'templates/{template}.png', 0)
     w, h = template_.shape[::-1]
     res = cv2.matchTemplate(screenshot, template_, cv2.TM_CCOEFF_NORMED)
     threshold = 0.8
     loc = tuple(zip(*np.where(res >= threshold)[::-1]))
-    if save_figs and len(loc) > 0:
+    if generate_results and len(loc) > 0:
         for pt in loc:
             cv2.rectangle(screenshot, pt, (pt[0] + w, pt[1] + h), (0, 0, 255), 2)
         i = 0
@@ -37,46 +36,68 @@ def find(template: str) -> ((int, int), ...):
 
 
 # get all 'href=\"\w+\"'  regexp in the file downloaded at http://textfiles.com/politics/CENSORSHIP/
-async def create_sentences_file() -> None:
-    session = aiohttp.ClientSession()
-    base_link = 'http://textfiles.com/politics/CENSORSHIP/'
-    async with session.get(base_link) as resp:
-        text = (await resp.text()).lower()
-        sub_links = re.findall('href=\"([a-zA-Z0-9.]*)\"', text.lower())
-        with open('sentences.txt', 'a') as f:
-            for sub_link in sub_links:
-                async with session.get(base_link + sub_link) as resp:
-                    text = (await resp.text()).lower()
-                    f.write(text)
+async def write_sentences_file(url: str = comments_base_link, session=None, f=None) -> None:
+    print(f'downloading {url} ...')
+    if session is None:
+        session = aiohttp.ClientSession()
+    if f is None:
+        f = open('sentences.txt', 'a')
+
+    async with session.get(url) as resp:
+        try:
+            text = await resp.text()
+            if 'href=' in text.lower():
+                for sublink in re.findall('href=\"([a-zA-Z0-9.]*)\"', text, re.IGNORECASE):
+                    await write_sentences_file(f'{url}/{sublink}', session, f)
+            else:
+                text = ''.join(re.findall('[a-zA-Z0-9 ."]*', text.lower()))
+                while '  ' in text:
+                    text = text.replace('  ', ' ')
+                f.write(text)
+        except Exception as e:
+            print(e)
 
 
 cached_sentences = None
 
 
-async def sentences():
+async def sentences()->[str, ...]:
     global cached_sentences
     if cached_sentences is None:
         if not os.path.exists('sentences.txt'):
-            await create_sentences_file()
+            await write_sentences_file()
         with open('sentences.txt') as f:
             cached_sentences = f.read().split(' ')
     return cached_sentences
 
 
-separators = (' ! ', ' ? ', '\n', '...') + ('. ',) * 2 + (', ',) * 3 + (' ',) * 12
+separators = (' ! ', ' ? ', '\n', '...') + ('. ',) * 2 + (', ',) * 3 + (' ',) * 20
 
 
-async def random_sentence():
+async def random_sentence()->str:
     length = random.randint(5, 30)
-    start = random.randint(0, len(await sentences()) - length)
-    parts = (await sentences())[start:start + length]
+
+    start = random.randint(0, len(await sentences()) - length) if len(await sentences()) >= length else 0
+    parts = (await sentences())[start:start + length] if len(await sentences()) >= length else []
     sep = np.random.choice(separators, length - 1)
-    s = ''
+    sentence = ''
     for i, part in enumerate(parts):
-        s += part
+        sentence += part
         if i < length - 1:
-            s += sep[i]
-    return s
+            sentence += sep[i]
+    sentence_with_mistakes = ''
+    for c in sentence:
+        if random.random() < 0.03:
+            c += c
+        if random.random() < 0.02:
+            c = c[:-1] + random.choice('qwertyuiopasdfghjklzxcvbnm')
+        if random.random() < 0.01:
+            sentence_with_mistakes += ' '
+        if random.random() < 0.02:
+            c = c.upper()
+
+        sentence_with_mistakes += c
+    return sentence_with_mistakes
 
 
 class State(Enum):
@@ -105,9 +126,10 @@ async def scroll(delta: int):
 
 
 async def write(text: str):
-    pyperclip.copy(text)
-    await asyncio.sleep(0.3)
-    pyautogui.hotkey('ctrl', 'v', interval=0.15)
+    for c in text:
+        pyautogui.press(c)
+        await asyncio.sleep(0.05)
+    await asyncio.sleep(0.1)
 
 
 class Bot:
@@ -199,5 +221,5 @@ class Bot:
                         await click(crosses[0])
                         self.state = State.MAP
 
-
-asyncio.run(Bot().run())
+if __name__ == '__main__':
+    asyncio.run(Bot().run())
