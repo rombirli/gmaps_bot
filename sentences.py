@@ -3,7 +3,6 @@ import random
 import re
 
 import aiohttp as aiohttp
-import numpy as np
 
 from config import comments_base_link
 
@@ -19,13 +18,15 @@ async def write_sentences_file(url: str = comments_base_link, session=None, f=No
         try:
             text = await resp.text()
             if 'href=' in text.lower():
-                for sublink in re.findall('href=\"([a-zA-Z0-9.]*)\"', text, re.IGNORECASE):
-                    await write_sentences_file(f'{url}/{sublink}', session, f)
+                for sublink in re.findall('href=\"([a-zA-Z0-9.-]*)\"', text, re.IGNORECASE):
+                    if '.' not in sublink or sublink.endswith('.txt'):
+                        await write_sentences_file(f'{url}/{sublink}', session, f)
             else:
-                text = ''.join(re.findall('[a-zA-Z0-9 ."]*', text.lower()))
+                text = ''.join(re.findall('[a-zA-Z0-9 "]*', text.lower().strip()))
                 while '  ' in text:
                     text = text.replace('  ', ' ')
                 f.write(text)
+                f.write(' ')
         except Exception as e:
             print(e)
 
@@ -33,40 +34,53 @@ async def write_sentences_file(url: str = comments_base_link, session=None, f=No
 cached_sentences = None
 
 
-async def sentences() -> [str, ...]:
+def sentences() -> [str, ...]:
     global cached_sentences
     if cached_sentences is None:
-        if not os.path.exists('sentences.txt'):
-            await write_sentences_file()
         with open('sentences.txt') as f:
             cached_sentences = f.read().split(' ')
     return cached_sentences
 
 
-separators = (' ! ', ' ? ', '\n', '...') + ('. ',) * 10 + (', ',) * 15 + (' ',) * 40
+hard_separators = (' ! ', ' ? ', '.\n', '...\n', ' : ', ' !\n', ' ?\n', '...  ')
+soft_separators = ('. ', ', ')
 
 
 async def random_sentence() -> str:
+    if not os.path.exists('sentences.txt'):
+        await write_sentences_file()
     length = random.randint(30, 60)
-    start = random.randint(0, len(await sentences()) - length)
-    parts = (await sentences())[start:start + length]
-    sep = np.random.choice(separators, length - 1)
+    start = random.randint(0, len(sentences()) - length)
+    parts = (sentences())[start:start + length]
     sentence = ''
     for i, part in enumerate(parts):
         sentence += part
-        if i < length - 1:
-            sentence += sep[i]
-    sentence_with_mistakes = ''
-    for c in sentence:
-        if random.random() < 0.001:
-            c += c
-        if random.random() < 0.001:
-            c = c[:-1] + random.choice('qwertyuiopasdfghjklzxcvbnm')
-        if random.random() < 0.001:
-            c = c.upper() if c.islower() else c.lower()
-        if len(sentence_with_mistakes) == 0 or len(sentence_with_mistakes) > 2 and sentence_with_mistakes[
-            -2] in '.?!\n':
+        if i == len(parts) - 1:
+            sentence += '.'
+        elif random.random() < 0.05:
+            sentence += random.choice(hard_separators)
+        elif random.random() < 0.1:
+            sentence += random.choice(soft_separators)
+        else:
+            sentence += ' '
+    fixed_sentence = ''
+    for i, c in enumerate(sentence):
+        if i == 0 or (i > 2 and fixed_sentence[-2] in '.?!:'):
             c = c.upper()
-        sentence_with_mistakes += c
+        fixed_sentence += c
+    return fixed_sentence
 
-    return sentence_with_mistakes
+
+if __name__ == '__main__':
+    import asyncio
+
+    loop = asyncio.new_event_loop()
+
+
+    async def print_random_sentences(n: int):
+        for i in range(n):
+            print(await random_sentence())
+            print('-' * 100)
+
+
+    loop.run_until_complete(print_random_sentences(100))

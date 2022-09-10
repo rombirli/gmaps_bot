@@ -1,14 +1,12 @@
 import asyncio
 import random
 from enum import Enum, auto
-import pyautogui
+
 from random_address import real_random_address
 
 from automation import move_to, click, scroll, write, press
 from images import find
 from sentences import random_sentence
-
-
 
 
 class State(Enum):
