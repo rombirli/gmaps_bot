@@ -122,13 +122,13 @@ async def click(p: (int, int)):
 
 async def scroll(delta: int):
     pyautogui.scroll(delta)
-    await asyncio.sleep(0.1)
+    await asyncio.sleep(0.02)
 
 
 async def write(text: str):
     for c in text:
         pyautogui.press(c)
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.001)
     await asyncio.sleep(0.1)
 
 
@@ -173,7 +173,7 @@ class Bot:
                                     await click(crosses[0])
                                     self.state = State.MOVING
                                 break
-                            await scroll(-200)
+                            await scroll(-400)
 
                         if not comment_buttons:
                             crosses = list(find('cross'))
