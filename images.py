@@ -1,11 +1,13 @@
 import os
+
 import cv2
 import numpy as np
 import pyautogui
 
-from config import generate_results
+from config import plot_figures
 
-def find(template: str) -> ((int, int), ...):
+
+def find(template: str, threshold: float = 0.8) -> ((int, int), ...):
     global i
     screenshot = pyautogui.screenshot()
     if not os.path.exists('generated'):
@@ -16,9 +18,9 @@ def find(template: str) -> ((int, int), ...):
     template_ = cv2.imread(f'templates/{template}.png', 0)
     w, h = template_.shape[::-1]
     res = cv2.matchTemplate(screenshot, template_, cv2.TM_CCOEFF_NORMED)
-    threshold = 0.8
+
     loc = tuple(zip(*np.where(res >= threshold)[::-1]))
-    if generate_results and len(loc) > 0:
+    if plot_figures and len(loc) > 0:
         for pt in loc:
             cv2.rectangle(screenshot, pt, (pt[0] + w, pt[1] + h), (0, 0, 255), 2)
         i = 0

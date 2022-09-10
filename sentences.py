@@ -4,18 +4,20 @@ import re
 
 import aiohttp as aiohttp
 
-from config import comments_base_link
+from config import comments_base_link, comments_excluded_links
 
 
 async def write_sentences_file(url: str = comments_base_link, session=None, f=None) -> None:
     print(f'downloading {url} ...')
+    if url in comments_excluded_links:
+        return
     if session is None:
         session = aiohttp.ClientSession()
     if f is None:
         f = open('sentences.txt', 'a')
 
-    async with session.get(url) as resp:
-        try:
+    try:
+        async with session.get(url) as resp:
             text = await resp.text()
             if 'href=' in text.lower():
                 for sublink in re.findall('href=\"([a-zA-Z0-9.-]*)\"', text, re.IGNORECASE):
@@ -27,8 +29,8 @@ async def write_sentences_file(url: str = comments_base_link, session=None, f=No
                     text = text.replace('  ', ' ')
                 f.write(text)
                 f.write(' ')
-        except Exception as e:
-            print(e)
+    except Exception as e:
+        print(e)
 
 
 cached_sentences = None
