@@ -61,13 +61,13 @@ class Bot:
                                 break
                             modify_buttons = list(find('button_modify'))
                             if modify_buttons:
-                                if Bot.close_menu():
+                                if await Bot.close_menu():
                                     self.state = State.MOVING
                                 break
                             await scroll(-400)
 
                         if not comment_buttons:
-                            if Bot.close_menu():
+                            if await Bot.close_menu():
                                 self.state = State.MAP
 
                 case State.COMMENTING:
@@ -91,7 +91,7 @@ class Bot:
                     ok_buttons = list(find('ok_button'))
                     if ok_buttons:
                         await click(ok_buttons[0])
-                        if Bot.close_menu():
+                        if await Bot.close_menu():
                             self.state = State.MAP
 
                 case State.MOVING:
@@ -102,7 +102,7 @@ class Bot:
                         await write(f'{lat}, {long}')
                         await press('enter')
                         self.state = State.MAP
-                    if Bot.close_menu():
+                    if await Bot.close_menu():
                         self.state = State.MAP
 
     def stop(self):
